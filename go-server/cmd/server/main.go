@@ -121,6 +121,9 @@ func main() {
 	router.POST("/api/items", handlers.ExchangeToken)
 	router.GET("/api/items/:id/accounts", handlers.GetItemAccounts)
 
+	// Transaction endpoints
+	router.POST("/api/items/:itemID/sync-transactions", handlers.SyncTransactionsForItem)
+
 	// -------------------------------------------------
 	// end API endpoints
 	// -------------------------------------------------
