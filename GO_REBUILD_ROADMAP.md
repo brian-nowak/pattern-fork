@@ -17,21 +17,48 @@ Build a Go server that:
 ## Project Structure
 
 ```
-go-server/
-├── cmd/
-│   └── server/
-│       └── main.go                 # Entry point
-├── internal/
-│   ├── config/                     # Environment configuration
-│   ├── db/                         # Database queries
-│   ├── handlers/                   # HTTP handlers
-│   ├── middleware/                 # HTTP middleware
-│   ├── plaid/                      # Plaid client wrapper
-│   └── services/                   # Business logic
-├── pkg/
-│   └── models/                     # Data models
-├── go.mod
-└── .env
+compound/
+├── go-server/                      # Go backend server
+│   ├── cmd/
+│   │   └── server/
+│   │       └── main.go             # Entry point, routing, config
+│   ├── internal/
+│   │   ├── db/
+│   │   │   ├── db.go               # Database connection & lifecycle
+│   │   │   ├── user.go             # User CRUD queries
+│   │   │   └── items.go            # Item CRUD queries (Phase 4)
+│   │   ├── handlers/
+│   │   │   ├── users.go            # User endpoints
+│   │   │   ├── link_token.go       # POST /api/link-token (Phase 4)
+│   │   │   └── items.go            # POST /api/items (Phase 4)
+│   │   ├── plaid/
+│   │   │   └── client.go           # Plaid API wrapper (Phase 4)
+│   │   └── middleware/             # HTTP middleware (CORS, logging)
+│   ├── pkg/
+│   │   └── models/                 # Data models (Phase 4)
+│   │       ├── user.go
+│   │       ├── item.go
+│   │       ├── account.go
+│   │       └── transaction.go
+│   ├── go.mod
+│   ├── go.sum
+│   └── .air.toml                   # Air hot-reload config
+│
+├── client-go/                      # React test app (Phase 4)
+│   ├── src/
+│   │   ├── App.jsx                 # Main test interface
+│   │   ├── api.js                  # API helpers
+│   │   └── App.css                 # Styling
+│   ├── .env                        # Plaid client ID config
+│   ├── package.json
+│   └── vite.config.js
+│
+├── database/
+│   └── init/
+│       └── create.sql              # Database schema
+│
+├── Makefile                        # Build targets (go-test-frontend added)
+└── docker-compose.yml              # Services (db required for testing)
 ```
 
 ---
@@ -44,10 +71,10 @@ go-server/
 - Understand Go project structure
 
 ### Tasks
-- [ ] Create `go-server/` directory structure
-- [ ] Run `go mod init github.com/bnowak/pattern-go`
-- [ ] Create `cmd/server/main.go` with basic HTTP server
-- [ ] Test with `/health` endpoint that returns "OK"
+- [x] Create `go-server/` directory structure
+- [x] Run `go mod init github.com/bnowak/pattern-go`
+- [x] Create `cmd/server/main.go` with basic HTTP server
+- [x] Test with `/health` endpoint that returns "OK"
 
 **Key Concepts:** Packages, imports, basic HTTP handling
 
@@ -71,11 +98,10 @@ go get github.com/joho/godotenv
 ```
 
 ### Tasks
-- [ ] Create `internal/config/config.go` to load env vars from `.env`
-- [ ] Refactor `main.go` to use Gin router
+- [x] Refactor `main.go` to use Gin router
 - [ ] Create `internal/handlers/health.go` for health check
-- [ ] Set up API route group `/api`
-- [ ] Add CORS middleware (frontend runs on :3001)
+- [x] Set up API route group `/api`
+- [x] Add CORS middleware (frontend runs on :3001)
 
 **Config should load:**
 - `PORT` (default: 8000)
@@ -107,20 +133,21 @@ go get github.com/jackc/pgx/v5/pgxpool
 ```
 
 ### Tasks
-- [ ] Create `internal/db/db.go` with `Connect()` and connection pool
-- [ ] Create models in `pkg/models/`:
+- [x] Create `internal/db/db.go` with `Connect()` and connection pool
+- [x] Create models in `pkg/models/`:
   - `user.go` (id, username, created_at, updated_at)
   - `item.go` (id, user_id, plaid_access_token, plaid_item_id, plaid_institution_id, status, transactions_cursor, timestamps)
   - `account.go` (id, item_id, plaid_account_id, name, mask, balances, type, subtype, timestamps)
   - `transaction.go` (id, account_id, plaid_transaction_id, category, type, name, amount, date, pending, timestamps)
-- [ ] Create `internal/db/users.go` with functions:
+- [x] Create `internal/db/users.go` with functions:
   - `CreateUser(ctx, username)` → User
   - `GetUserByID(ctx, id)` → User
   - `GetUserByUsername(ctx, username)` → User
-- [ ] Create `internal/handlers/users.go` with endpoints:
+- [x] Create `internal/handlers/users.go` with endpoints:
   - `POST /api/users` (create user)
-  - `GET /api/users/:id` (get user)
-- [ ] Initialize database connection in `main.go`
+  - `GET /api/users/:id` (get user by ID)
+  - and get user by username
+- [x] Initialize database connection in `main.go`
 
 **Database Schema:** Use existing PostgreSQL schema from `/database/init/create.sql`
 
@@ -142,32 +169,125 @@ go get github.com/jackc/pgx/v5/pgxpool
 
 ### Dependencies
 ```bash
-go get github.com/plaid/plaid-go/v31/plaid
+go get github.com/plaid/plaid-go/v40/plaid
 ```
 
 ### Tasks
-- [ ] Create `internal/plaid/client.go`:
+- [x] Create `internal/plaid/client.go`:
   - `Initialize(clientID, secret, env)` - set up Plaid client
   - `GetClient()` - return client instance
-- [ ] Create `internal/handlers/link_token.go`:
-  - `POST /api/link-token` - create Plaid link token for user
-- [ ] Create `internal/db/items.go` with functions:
-  - `CreateItem(ctx, userID, accessToken, plaidItemID, institutionID)` → Item
-  - `GetItemByPlaidItemID(ctx, plaidItemID)` → Item
-  - `UpdateTransactionsCursor(ctx, plaidItemID, cursor)` → error
-- [ ] Create `internal/handlers/items.go`:
-  - `POST /api/items` - exchange public token, save item to DB
-- [ ] Initialize Plaid client in `main.go`
+  - Full Plaid API wrapper with: `CreateLinkToken()`, `ExchangePublicToken()`, `GetAccounts()`, `GetItem()`, `InstitutionsGetByID()`, `SyncTransactions()`
+- [x] Create `internal/handlers/link_token.go`:
+  - `MakeLinkTokenHandler()` - closure-based handler for `POST /api/link-token`
+  - Supports normal mode (new account) and update mode (re-linking)
+- [x] Create `internal/db/items.go` with functions:
+  - `GetItemByID(ctx, id)` - fetch item by ID
+  - `GetItemsByUserID(ctx, userID)` - fetch all items for user
+  - `CreateItem(ctx, userID, accessToken, plaidItemID, institutionID, status)` → Item
+  - `UpdateItemTransactionsCursor(ctx, itemID, cursor)` → error
+  - `UpdateItemStatus(ctx, itemID, status)` → error
+  - `DeleteItem(ctx, itemID)` → error
+- [x] Create `internal/handlers/items.go`:
+  - `ExchangeToken()` - `POST /api/items` handler
+  - Exchanges public token, fetches accounts, stores item, returns accounts
+  - `GetItemAccounts()` - `GET /api/items/:id/accounts` (not yet implemented)
+- [x] Create `pkg/models/` with data models:
+  - `User` - user data
+  - `Item` - Plaid item with tokens and institution
+  - `Account` - bank account details
+  - `Transaction` - transaction record
+- [x] Create `/client-go` - Minimal React test app:
+  - User creation and selection
+  - Link token generation (normal and update modes)
+  - Plaid Link modal integration
+  - Token exchange and account display
+  - Error handling and loading states
+- [x] Initialize Plaid client in `main.go`
 
 **Plaid API Calls Needed:**
 - `LinkTokenCreate` - create link token
 - `ItemPublicTokenExchange` - exchange public token for access token
+
+**Testing Strategy:**
+
+**Phase 4 Testing - Complete Plaid Link Flow:**
+
+1. **Setup Prerequisites:**
+   ```bash
+   # 1. Database and services running
+   make start
+
+   # 2. Install client-go dependencies
+   cd client-go
+   npm install
+   ```
+
+2. **Launch Test Environment (One Command):**
+   ```bash
+   # From project root - launches database + Go server + React test app
+   make go-test-frontend
+   ```
+
+3. **Manual Testing Workflow:**
+   - Open http://localhost:5173 in browser
+   - Create test user (e.g., "testuser")
+   - Click "Get Link Token" button
+   - Plaid Link modal opens
+   - Use Plaid Sandbox credentials:
+     - Username: `user_good`
+     - Password: `pass_good`
+   - Select test institution (e.g., "Playtypus Checking")
+   - Authorize and complete flow
+   - Verify linked account appears in test app UI
+   - Check accounts and institution name displayed
+
+4. **Verify Backend API Responses:**
+   ```bash
+   # POST /api/link-token should return
+   {
+     "link_token": "link-sandbox-..."
+   }
+
+   # POST /api/items should return
+   {
+     "item_id": "123",
+     "plaid_item_id": "item-sandbox-...",
+     "institution_name": "Playtypus Checking",
+     "access_token": "access-sandbox-...",
+     "accounts": [
+       {
+         "id": "account-id",
+         "name": "Checking Account",
+         "mask": "1234",
+         "type": "depository",
+         "subtype": "checking"
+       }
+     ]
+   }
+   ```
+
+5. **Verify Database Storage:**
+   ```bash
+   make sql
+   # In psql:
+   SELECT id, username FROM users;
+   SELECT id, user_id, plaid_item_id, institution_id FROM items;
+   SELECT id, item_id, name, mask FROM accounts;
+   ```
+
+6. **Test Update Mode:**
+   - Click "Re-link Bank" on an existing item
+   - Modal opens in update mode
+   - Link the same or different institution
+   - Verify status remains consistent
 
 **Key Concepts:** API clients, configuration, JSON binding
 
 **Resources:**
 - https://github.com/plaid/plaid-go
 - https://plaid.com/docs/api/tokens/
+- Reference Node.js implementation: `/server/routes/items.js`
+- Existing React integration: `/client/src/services/link.tsx`
 
 ---
 
@@ -179,7 +299,7 @@ go get github.com/plaid/plaid-go/v31/plaid
 - Handle added, modified, and removed transactions
 
 ### Tasks
-- [ ] Create `internal/db/accounts.go` with functions:
+- [x] Create `internal/db/accounts.go` with functions:
   - `CreateOrUpdateAccount(ctx, itemID, account)` → error (uses UPSERT)
   - `GetAccountByPlaidID(ctx, plaidAccountID)` → Account
 - [ ] Create `internal/db/transactions.go` with functions:
@@ -407,15 +527,23 @@ func DoSomething(ctx context.Context, arg string) error {
 
 ## Progress Tracker
 
-- [ ] Phase 1: Setup & Hello World (30 min)
-- [ ] Phase 2: Web Framework & Routing (1-2 hours)
-- [ ] Phase 3: PostgreSQL Integration (2-3 hours)
-- [ ] Phase 4: Plaid Integration (3-4 hours)
+- [x] Phase 1: Setup & Hello World (30 min) ✅ Completed
+- [x] Phase 2: Web Framework & Routing (1-2 hours) ✅ Completed
+- [x] Phase 3: PostgreSQL Integration (2-3 hours) ✅ Completed
+- [x] Phase 4: Plaid Integration (3-4 hours) ✅ Completed
+  - ✅ Plaid client wrapper (`internal/plaid/client.go`)
+  - ✅ Link token generation endpoint (`POST /api/link-token`)
+  - ✅ Item exchange endpoint (`POST /api/items`)
+  - ✅ Database functions (`internal/db/items.go`)
+  - ✅ Data models in `pkg/models/`
+  - ✅ React test app for full flow testing (`/client-go`)
+  - ✅ Make target for one-command testing (`make go-test-frontend`)
 - [ ] Phase 5: Transaction Sync (3-4 hours)
 - [ ] Phase 6: Testing & Refinement (2-3 hours)
 - [ ] Phase 7: Additional Features (Optional)
 
 **Total Estimated Time:** 12-20 hours
+**Current Status:** 4/7 phases complete (57%)
 
 ---
 

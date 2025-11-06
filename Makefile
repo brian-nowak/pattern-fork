@@ -4,7 +4,7 @@ envfile := ./.env
 clear_db_after_schema_change := database/last-cleared.dummy
 db_schema := database/init/*
 
-.PHONY: help start start-no-webhooks debug sql logs stop clear-db
+.PHONY: help start start-no-webhooks debug sql logs stop clear-db go-build go-run go-test go-air go-test-frontend
 
 # help target adapted from https://gist.github.com/prwhite/8168133#gistcomment-2278355
 TARGET_MAX_CHAR_NUM=20
@@ -64,6 +64,31 @@ stop:
 ## Clear the sandbox and production databases
 clear-db: stop
 	docker volume rm $(current_dir)_pg_{sandbox,production}_data 2>/dev/null || true
+
+## Build the Go server
+go-build:
+	cd go-server && go build -o server ./cmd/server
+
+## Run the Go server (requires .env and database running)
+go-run:
+	cd go-server && go run ./cmd/server
+
+## Test the Go server (requires .env and database running)
+go-test:
+	cd go-server && go test ./...
+
+## Watch and auto-rebuild Go server on file changes with Air (hot-reload)
+go-air:
+	cd go-server && ~/go/bin/air -c .air.toml
+
+## Test Plaid Link flow: launches Go server + React frontend (hit Ctrl+C to stop both)
+go-test-frontend:
+	@echo "Starting Go server (port 8000) and React frontend (port 5173)..."
+	@echo "React frontend: http://localhost:5173"
+	@echo ""
+	@echo "Press Ctrl+C to stop both servers"
+	@echo ""
+	@(cd go-server && ~/go/bin/air -c .air.toml &) && (cd client-go && npm run dev); kill %1 2>/dev/null || true
 
 $(envfile):
 	@echo "Error: .env file does not exist! See the README for instructions."
