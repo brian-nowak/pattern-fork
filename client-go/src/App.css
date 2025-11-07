@@ -327,3 +327,60 @@ button:disabled {
 .debug li {
   padding: 0.25rem 0;
 }
+
+.transactions-list {
+  margin-top: 1.5rem;
+}
+
+.transactions-list h3 {
+  margin-top: 0;
+  color: var(--primary);
+}
+
+.transactions-table {
+  overflow-x: auto;
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.transactions-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.transactions-table thead {
+  background: var(--light-bg);
+}
+
+.transactions-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--primary);
+  border-bottom: 2px solid var(--border);
+}
+
+.transactions-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.transactions-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.transactions-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.no-transactions {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--light-bg);
+  border-radius: 4px;
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+}

@@ -175,6 +175,7 @@ CREATE TABLE transactions_table
   plaid_transaction_id text UNIQUE NOT NULL,
   plaid_category_id text,
   category text,
+  category_data jsonb,
   type text NOT NULL,
   name text NOT NULL,
   amount numeric(28,10) NOT NULL,

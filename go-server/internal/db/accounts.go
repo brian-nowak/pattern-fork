@@ -116,3 +116,28 @@ func DeleteAccount(ctx context.Context, accountID int) error {
 
 	return nil
 }
+
+// Query accounts_table by plaidAccountID, return Account object
+func GetAccountByPlaidAccountID(ctx context.Context, plaidAccountID string) (*models.Account, error) {
+	query := `SELECT id, item_id, plaid_account_id, name, mask, type, subtype, created_at, updated_at
+            FROM accounts_table WHERE plaid_account_id=$1`
+
+	account := &models.Account{}
+
+	err := conn.QueryRow(ctx, query, plaidAccountID).Scan(
+		&account.ID,
+		&account.ItemID,
+		&account.PlaidAccountID,
+		&account.Name,
+		&account.Mask,
+		&account.Type,
+		&account.Subtype,
+		&account.CreatedAt,
+		&account.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+
+	return account, nil
+}

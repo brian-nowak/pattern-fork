@@ -13,8 +13,10 @@ function App() {
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('normal'); // 'normal' or 'update'
   const [selectedItemId, setSelectedItemId] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [showTransactions, setShowTransactions] = useState(false);
 
-  // Create a new user
+  // Create a new user or load existing user by ID
   const handleCreateUser = async (e) => {
     e.preventDefault();
     if (!username.trim()) return;
@@ -22,10 +24,34 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const user = await api.createUser(username);
-      setUsers([...users, user]);
-      setCurrentUser(user);
-      setUsername('');
+      const isNumeric = /^\d+$/.test(username.trim());
+      let user;
+
+      if (isNumeric) {
+        // Try to load user by ID
+        try {
+          user = await api.getUser(parseInt(username));
+          // Check if user already in list, if not add them
+          const userExists = users.some(u => u.id === user.id);
+          if (!userExists) {
+            setUsers([...users, user]);
+          }
+          setCurrentUser(user);
+          setUsername('');
+        } catch (err) {
+          // If not found by ID, create as new user with this username
+          user = await api.createUser(username);
+          setUsers([...users, user]);
+          setCurrentUser(user);
+          setUsername('');
+        }
+      } else {
+        // Create user with given username
+        user = await api.createUser(username);
+        setUsers([...users, user]);
+        setCurrentUser(user);
+        setUsername('');
+      }
     } catch (err) {
       setError(`Failed to create user: ${err.message}`);
     } finally {
@@ -81,11 +107,31 @@ function App() {
     }
   };
 
-  const handlePlaidExit = (err, metadata) => {
+  const handlePlaidExit = (err) => {
     if (err) {
       setError(`Plaid Link closed with error: ${err.message}`);
     } else {
       setLinkToken(null);
+    }
+  };
+
+  // Get transactions for current user
+  const handleGetTransactions = async () => {
+    if (!currentUser) {
+      setError('Please create or select a user first');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getUserTransactions(currentUser.id);
+      setTransactions(data.transactions || []);
+      setShowTransactions(true);
+    } catch (err) {
+      setError(`Failed to get transactions: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -257,6 +303,54 @@ function App() {
                 </div>
               ))}
             </div>
+          </section>
+        )}
+
+        {/* Get Transactions Section */}
+        {currentUser && (
+          <section className="card">
+            <h2>5. View Transactions</h2>
+            <button onClick={handleGetTransactions} disabled={loading}>
+              {loading ? 'Loading...' : 'Get All Transactions'}
+            </button>
+
+            {showTransactions && transactions.length > 0 && (
+              <div className="transactions-list">
+                <h3>Transactions ({transactions.length})</h3>
+                <div className="transactions-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Name</th>
+                        <th>Amount</th>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th>Pending</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.map((tx) => (
+                        <tr key={tx.id}>
+                          <td>{new Date(tx.date).toLocaleDateString()}</td>
+                          <td>{tx.name}</td>
+                          <td>${Math.abs(tx.amount).toFixed(2)}</td>
+                          <td>{tx.type}</td>
+                          <td>{tx.category || 'N/A'}</td>
+                          <td>{tx.pending ? 'Yes' : 'No'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {showTransactions && transactions.length === 0 && (
+              <div className="no-transactions">
+                <p>No transactions found for this user.</p>
+              </div>
+            )}
           </section>
         )}
 

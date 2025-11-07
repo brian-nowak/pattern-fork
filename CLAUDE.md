@@ -236,6 +236,20 @@ See [database/init/create.sql](database/init/create.sql) for full schema.
 - Configure in Plaid Dashboard
 - Test institution: "Playtypus OAuth Bank"
 
+### Plaid Sandbox Testing Credentials
+**General Testing:**
+- Username: `user_good`
+- Password: `pass_good`
+
+**Transaction Testing:**
+- Username: `user_transactions_dynamic`
+- Password: any value
+
+**Persona-based Testing (detailed transaction data):**
+- `user_ewa_user` - Standard individual
+- `user_yuppie` - Higher balance account
+- `user_small_business` - Business account transactions
+
 ---
 
 ## Development Notes

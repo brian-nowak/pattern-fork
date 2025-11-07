@@ -123,6 +123,7 @@ func main() {
 
 	// Transaction endpoints
 	router.POST("/api/items/:itemID/sync-transactions", handlers.SyncTransactionsForItem)
+	router.GET("/api/transactions/:userID", handlers.GetUserTransactions)
 
 	// -------------------------------------------------
 	// end API endpoints

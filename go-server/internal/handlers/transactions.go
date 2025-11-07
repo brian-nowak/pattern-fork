@@ -11,6 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// called inside SyncTransactionsForItem
+// accepts each transaction object from the plaid data
+// func CreateOrUpdateTransaction(c *gin.Context) {
+
+// }
+
 // SyncTransactionsForItem handles POST /api/transactions/sync
 // accepts itemID
 func SyncTransactionsForItem(c *gin.Context) {
@@ -36,12 +42,7 @@ func SyncTransactionsForItem(c *gin.Context) {
 	}
 
 	// use access token + cursor to call plaid.NewTransactionsSyncRequest
-	// returns :
-	// result.Added = resp.GetAdded()
-	// result.Modified = resp.GetModified()
-	// result.Removed = resp.GetRemoved()
-	// result.NextCursor = resp.GetNextCursor()
-	// result.HasMore = resp.GetHasMore()
+	// returns plaid objects
 	result, err := plaidpkg.SyncTransactions(context.Background(), item.PlaidAccessToken, item.TransactionsCursor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -50,12 +51,98 @@ func SyncTransactionsForItem(c *gin.Context) {
 		return
 	}
 
-	// we need to add more but for now lets just return result for testing
-	// temp reformat result into json for API
+	// move this to CreateOrUpdateTransaction later
+	// combine adds and updates
+	allTransactions := append(result.Added, result.Modified...)
+
+	// loop thru each
+	for _, plaidTx := range allTransactions {
+		// get our DB account ID from plaid account ID
+		account, err := db.GetAccountByPlaidAccountID(context.Background(), plaidTx.GetAccountId())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to get DB Account ID for: " + err.Error(),
+			})
+			return
+		}
+
+		// map category data
+		categoryData := map[string]interface{}{
+			"legacy":                    plaidTx.GetCategory(),
+			"personal_finance_category": plaidTx.GetPersonalFinanceCategory(),
+		}
+
+		// Convert account owner string to *string
+		accountOwner := plaidTx.GetAccountOwner()
+		var ownerPtr *string
+		if accountOwner != "" {
+			ownerPtr = &accountOwner
+		}
+
+		_, err = db.CreateOrUpdateTransaction(
+			context.Background(),
+			account.ID,
+			plaidTx.GetTransactionId(),
+			categoryData,
+			plaidTx.GetTransactionType(),
+			plaidTx.GetName(),
+			plaidTx.GetAmount(),
+			plaidTx.GetIsoCurrencyCode(),
+			plaidTx.GetUnofficialCurrencyCode(),
+			plaidTx.GetDate(),
+			plaidTx.GetPending(),
+			ownerPtr,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to store transaction: " + err.Error(),
+			})
+			return
+		}
+	}
+
+	// Update the cursor for the next sync
+	err = db.UpdateItemTransactionsCursor(context.Background(), itemID, result.NextCursor)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to update cursor: " + err.Error(),
+		})
+		return
+	}
+
+	// Return summary of what was synced
 	c.JSON(http.StatusOK, gin.H{
-		"added":      result.Added,
-		"modified":   result.Modified,
-		"removed":    result.Removed,
-		"nextCursor": result.NextCursor,
+		"success":       true,
+		"addedCount":    len(result.Added),
+		"modifiedCount": len(result.Modified),
+		"removedCount":  len(result.Removed),
+	})
+}
+
+// handles GET /api/users/:user_id/transactions
+// Returns all transactions for a specific user
+func GetUserTransactions(c *gin.Context) {
+	// parse user ID from URL parameter
+	userIDStr := c.Param("userID")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid user id",
+		})
+		return
+	}
+
+	// get all transactions for the user
+	transactions, err := db.GetTransactionByUserID(context.Background(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to get transactions: " + err.Error(),
+		})
+		return
+	}
+
+	// return transactions
+	c.JSON(http.StatusOK, gin.H{
+		"transactions": transactions,
 	})
 }

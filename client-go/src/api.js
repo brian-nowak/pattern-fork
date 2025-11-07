@@ -50,4 +50,10 @@ export const getItemAccounts = async (itemId) => {
   return response.data;
 };
 
+// Get user's transactions
+export const getUserTransactions = async (userId) => {
+  const response = await api.get(`/api/transactions/${userId}`);
+  return response.data;
+};
+
 export default api;
